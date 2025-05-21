@@ -25,7 +25,7 @@ def populate_initial_prompts(conn: sqlite3.Connection):
     cur = conn.cursor()
     cur.execute("SELECT COUNT(1) FROM library_prompts;")
     if cur.fetchone()[0] == 0:
-        records = generate_prompts()  # [(description, prompt), ...]
+        records = generate_prompts()
         cur.executemany(
             "INSERT INTO library_prompts (description, prompt) VALUES (?, ?);",
             records
@@ -56,49 +56,48 @@ def delete_prompt(conn: sqlite3.Connection, prompt_id: int):
     conn.commit()
 
 def main():
-    st.title("📚 Библиотека промптов")
-
-    # 1. Подключаемся к БД и инициализируем таблицу
+    # Каждый раз при заходе на страницу заново инициализируем и подгружаем данные
     conn = get_connection()
     init_prompts_table(conn)
     populate_initial_prompts(conn)
-
-    # 2. Загружаем данные
     df = fetch_prompts(conn)
-    st.session_state["library_prompts_df"] = df  # делают доступными во всём приложении
 
-    # 3. Если пусто — подсказка
+    st.title("📚 Библиотека промптов")
+    st.markdown("Нажмите на любой промпт, чтобы развернуть его и отредактировать или удалить.")
+
     if df.empty:
         st.info("В библиотеке промптов пока нет записей.")
         return
 
-    # 4. Отображаем каждый промпт с возможностью редактировать/удалять
+    # Для каждой записи создаём expander с полями и кнопками
     for row in df.itertuples(index=False):
-        with st.expander(f"#{row.id}: {row.description}", expanded=False):
-            # Инпуты для редактирования
+        with st.expander(f"#{row.id} — {row.description}", expanded=False):
+            # Поля для редактирования
             new_desc = st.text_input(
-                "Краткое описание",
+                label="Краткое описание",
                 value=row.description,
                 key=f"desc_{row.id}"
             )
             new_text = st.text_area(
-                "Текст промпта",
+                label="Промпт",
                 value=row.prompt,
                 key=f"text_{row.id}",
-                height=120
+                height=150
             )
-            # Кнопки
+
             col1, col2 = st.columns(2)
+            # Сохранение правок
             with col1:
                 if st.button("💾 Сохранить", key=f"save_{row.id}"):
                     update_prompt(conn, row.id, new_desc, new_text)
                     st.success(f"Промпт #{row.id} обновлён")
-                    st.rerun()
+                    st.experimental_rerun()
+            # Удаление
             with col2:
                 if st.button("🗑️ Удалить", key=f"del_{row.id}"):
                     delete_prompt(conn, row.id)
                     st.success(f"Промпт #{row.id} удалён")
-                    st.rerun()
+                    st.experimental_rerun()
 
 if __name__ == "__main__":
     main()
