@@ -53,12 +53,13 @@ def process_user_input(client, conn):
     st.session_state.messages.append({"role": "user", "content": user_input})
     st.chat_message("user").write(user_input)
 
-    # Запрос к LLM
+    # Параметры LLM
     model       = st.session_state.get("model", "gpt-3.5-turbo")
     temperature = st.session_state.get("temperature", 0.7)
     top_p       = st.session_state.get("top_p", 0.9)
     max_tokens  = st.session_state.get("max_tokens", 256)
 
+    # Запрос к LLM
     with st.spinner("Генерирую ответ..."):
         resp = client.chat.completions.create(
             model=model,
@@ -83,7 +84,7 @@ def process_user_input(client, conn):
     return user_input, assistant_msg
 
 def save_prompt_to_library(conn, text: str, description: str = ""):
-    """Сохраняет переданный текст в библиотеку промптов."""
+    """Сохраняет данный текст (LLM-запрос) в библиотеку промптов."""
     conn.execute(
         "INSERT INTO library_prompts (description, prompt) VALUES (?, ?);",
         (description, text)
@@ -107,12 +108,15 @@ def main():
 
     # 4. Обработка ввода пользователя
     user_input, assistant_msg = process_user_input(client, conn)
-    if user_input is None:
+    if assistant_msg is None:
         return
 
-    # 5. Кнопка сохранения запроса пользователя
-    if st.button("➕ Сохранить запрос в библиотеку"):
-        save_prompt_to_library(conn, user_input)
+    # 5. Форма добавления в библиотеку
+    st.markdown("---")
+    st.subheader("Добавить ответ LLM в библиотеку промптов")
+    desc = st.text_input("Краткое описание", key="libp_desc")
+    if st.button("➕ Добавить ответ в библиотеку", key="libp_save"):
+        save_prompt_to_library(conn, assistant_msg, desc)
 
 if __name__ == "__main__":
     main()
