@@ -4,69 +4,70 @@ import streamlit as st
 from openai import OpenAI
 
 def get_openai_client():
-    api_key = st.session_state.get("openai_api_key", "")
+    """Возвращает клиента OpenAI, если указан API-ключ."""
+    api_key = st.session_state.get("openai_api_key", "").strip()
     if not api_key:
-        st.warning("Укажите OpenAI API Key в настройках LLM")
+        st.warning("Укажите ваш OpenAI API Key в настройках LLM")
         return None
-    return OpenAI(api_key=api_key)
+    try:
+        return OpenAI(api_key=api_key)
+    except Exception as e:
+        st.error(f"Ошибка при инициализации клиента OpenAI: {e}")
+        return None
 
-def send_prompt():
-    """Callback для отправки промпта при нажатии Enter."""
+def main():
+    st.title("💬 Чат для опытного маркетолога")
+
+    # 1. Инициализируем клиента
     client = get_openai_client()
     if client is None:
         return
-    prompt = st.session_state.prompt_input.strip()
-    if not prompt:
-        st.error("Промпт не может быть пустым.")
-        return
 
-    # Параметры модели
+    # 2. Параметры модели из сайдбара
     model       = st.session_state.get("model",      "gpt-3.5-turbo")
     temperature = st.session_state.get("temperature", 0.7)
     top_p       = st.session_state.get("top_p",       0.9)
     max_tokens  = st.session_state.get("max_tokens",  256)
 
-    # Выполняем запрос
-    with st.spinner("Генерируем ответ..."):
-        resp = client.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=temperature,
-            top_p=top_p,
-            max_tokens=max_tokens,
-        )
-    answer = resp.choices[0].message.content
+    # 3. Инициализируем историю
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = [
+            {
+                "role": "system",
+                "content": (
+                    "Вы — опытный маркетолог с многолетним опытом создания "
+                    "продающих и мотивирующих на покупку текстов. "
+                    "Помогайте формулировать привлекательные заголовки, описания "
+                    "товаров и рекламные сообщения."
+                )
+            }
+        ]
 
-    # Сохраняем ответ в session_state и очищаем поле ввода
-    st.session_state.last_answer = answer
-    st.session_state.prompt_input = ""
+    # 4. Отрисовываем историю
+    for msg in st.session_state.chat_history:
+        st.chat_message(msg["role"]).write(msg["content"])
 
-def main():
-    st.title("🔍 Тестирование промптов")
+    # 5. Принимаем ввод пользователя
+    user_input = st.chat_input("Введите промпт и нажмите Enter…")
+    if user_input:
+        # Добавляем сообщение пользователя
+        st.session_state.chat_history.append({"role": "user", "content": user_input})
+        st.chat_message("user").write(user_input)
 
-    # Инициализация клиента (и ранний выход, если нет ключа)
-    client = get_openai_client()
-    if client is None:
-        return
+        # 6. Запрашиваем ответ у модели
+        with st.spinner("Генерирую ответ..."):
+            resp = client.chat.completions.create(
+                model=model,
+                messages=st.session_state.chat_history,
+                temperature=temperature,
+                top_p=top_p,
+                max_tokens=max_tokens
+            )
+        assistant_msg = resp.choices[0].message.content
 
-    # Поле для последнего ответа
-    last = st.session_state.get("last_answer", "")
-    st.text_area(
-        label="Ответ модели",
-        value=last,
-        height=200,
-        key="last_answer_area",
-        disabled=True
-    )
-
-    st.markdown("---")
-
-    # Поле ввода нового промпта: отправка по Enter
-    st.text_input(
-        label="Введите промпт и нажмите Enter",
-        key="prompt_input",
-        on_change=send_prompt
-    )
+        # 7. Отображаем и сохраняем ответ
+        st.session_state.chat_history.append({"role": "assistant", "content": assistant_msg})
+        st.chat_message("assistant").write(assistant_msg)
 
 if __name__ == "__main__":
     main()
