@@ -10,10 +10,14 @@ def get_connection():
     Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
     return sqlite3.connect(DB_PATH, check_same_thread=False)
 
+
+def get_connection():
+    Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
+    return sqlite3.connect(DB_PATH, check_same_thread=False)
+
 def init_db_and_data():
     conn = get_connection()
     c = conn.cursor()
-    # Таблица клиентов
     c.execute("""
         CREATE TABLE IF NOT EXISTS customers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -21,7 +25,9 @@ def init_db_and_data():
             language TEXT, birth_date TEXT, segment TEXT,
             favorite_roast TEXT, favorite_coffee_type TEXT,
             favorite_coffee TEXT, brew_method TEXT,
-            signup_date TEXT, last_purchase TEXT, last_coffee_bought TEXT
+            signup_date TEXT, last_purchase TEXT, last_coffee_bought TEXT,
+            discount INTEGER, email TEXT, total_orders INTEGER,
+            recommendations TEXT, order_source TEXT
         )
     """)
     c.execute("SELECT COUNT(*) FROM customers")
@@ -31,12 +37,13 @@ def init_db_and_data():
             INSERT INTO customers (
                 first_name, last_name, patronymic, language, birth_date,
                 segment, favorite_roast, favorite_coffee_type, favorite_coffee,
-                brew_method, signup_date, last_purchase, last_coffee_bought
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                brew_method, signup_date, last_purchase, last_coffee_bought,
+                discount, email, total_orders, recommendations, order_source
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, customers)
         conn.commit()
 
-    # Таблица промптов
+    # Остальное без изменений
     c.execute("""
         CREATE TABLE IF NOT EXISTS library_prompts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
