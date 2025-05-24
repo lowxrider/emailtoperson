@@ -1,36 +1,26 @@
 # pages/page_customers.py
 
 import streamlit as st
-from utils.db import get_connection, init_db, reset_customers, insert_customers, fetch_customers
-from utils.generator import generate_customers
+import pandas as pd
+from utils.db import fetch_customers, get_connection
+from datetime import datetime
 
 def main():
-    st.title("👥 Клиенты (CRM)")
+    st.title("👥 CRM Клиенты")
 
-    # 1. Подготовка БД
-    conn = get_connection()
-    init_db(conn)
-
-    # 2. Проверяем, есть ли уже клиенты
-    df = fetch_customers(conn)
+    df = fetch_customers()
     if df.empty:
-        # Если таблица пуста, генерируем и сохраняем
-        clients = generate_customers(100)
-        insert_customers(conn, clients)
-        # Перечитываем
-        df = fetch_customers(conn)
-    else:
-        st.info("Загружены существующие данные клиентов из базы.")
+        st.info("В базе данных нет клиентов.")
+        return
 
-    # 3. Показ данных
-    st.dataframe(df)
+    st.dataframe(df, use_container_width=True)
 
-    # 4. Скачать CSV
+    # Кнопка для скачивания клиентов в csv
     csv = df.to_csv(index=False).encode("utf-8")
     st.download_button(
-        "Скачать CSV",
+        label="Скачать как CSV",
         data=csv,
-        file_name="customers.csv",
+        file_name=f"customers_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
         mime="text/csv"
     )
 
