@@ -4,8 +4,8 @@ DB_PATH = "data/app.db"
 
 DEFAULT_MODEL = "gpt-3.5-turbo"
 DEFAULT_TEMPERATURE = 0.7
-DEFAULT_TOP_P = 0.9
-DEFAULT_MAX_TOKENS = 256
+DEFAULT_TOP_P = 0.3
+DEFAULT_MAX_TOKENS = 600
 
 PAGES = {
     "Email Generator":     "page_email_generator",
