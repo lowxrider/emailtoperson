@@ -39,7 +39,7 @@ def generate_customers(n=100):
         last_purchase = last_purchase_dt.isoformat()
         last_coffee_bought = random.choice(coffees)
         discount = random.choice([0, 5, 10, 15, 20, 25, 30])
-        email = "stas.krdpltsv+discount@gmail.com"
+        email = "testforproject123456789@gmail.com"
         total_orders = random.randint(1, 50)
         recommendations = ', '.join(random.sample(coffees, k=random.choice([2, 3])))
         order_source = random.choice(sources)
