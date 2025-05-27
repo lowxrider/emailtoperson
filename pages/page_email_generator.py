@@ -85,7 +85,7 @@ def main():
 
                 # Вычисляем deadline
                 bd = datetime.fromisoformat(client_row['birth_date'])
-                client_row['deadline'] = (bd + timedelta(days=7)).strftime("%d.%m.%Y")
+                client_row['deadline'] = (bd + timedelta(days=7)).strftime("%d.%m")
 
                 # Формируем промпт
                 filled_prompt = prompt_template.format(**client_row)
