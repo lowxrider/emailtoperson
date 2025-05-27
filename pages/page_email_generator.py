@@ -1,13 +1,14 @@
 # pages/page_email_generator.py
 
 import streamlit as st
+import streamlit.components.v1 as components
 from openai import OpenAI
 from utils.db import fetch_customers, fetch_prompts
 from config import DEFAULT_MODEL, DEFAULT_TEMPERATURE, DEFAULT_TOP_P, DEFAULT_MAX_TOKENS
-import streamlit.components.v1 as components
+from datetime import datetime, timedelta
 
 def main():
-    st.title("✉️ Генератор Email-рассылок (HTML-превью)")
+    st.title("✉️ Генератор HTML Email-рассылок")
 
     # 1) Проверка API-ключа
     api_key = st.session_state.get("openai_api_key", "").strip()
@@ -24,79 +25,71 @@ def main():
 
     # 3) Загрузка клиентов и промптов из БД
     customers_df = fetch_customers()
-    prompts_df   = fetch_prompts()
+    if customers_df.empty:
+        st.info("В базе нет клиентов для рассылки.")
+        return
+
+    prompts_df = fetch_prompts()
+    if prompts_df.empty:
+        st.info("В библиотеке промптов нет записей.")
+        return
 
     # 4) Мультивыбор клиентов
-    client_map = {
-        f"{row['first_name']} {row['last_name']} (ID {row['id']})": row["id"]
-        for _, row in customers_df.iterrows()
+    customer_map = {
+        f"{r['first_name']} {r['last_name']} (ID {r['id']})": r['id']
+        for _, r in customers_df.iterrows()
     }
-    selected = st.multiselect(
-        "Выберите клиентов для рассылки", options=list(client_map.keys())
+    selected_clients = st.multiselect(
+        "Выберите клиентов для рассылки",
+        options=list(customer_map.keys())
     )
-    selected_ids = [client_map[k] for k in selected]
+    selected_ids = [customer_map[name] for name in selected_clients]
 
-    # 5) Выбор шаблона промпта
-    prompt_map = {row["description"]: row["prompt"] for _, row in prompts_df.iterrows()}
-    chosen_desc = st.selectbox("Выберите шаблон (промпт)", options=list(prompt_map.keys()))
-    template    = prompt_map[chosen_desc]
+    # 5) Выпадающий список промптов
+    prompt_map = {
+        r['description']: r['prompt']
+        for _, r in prompts_df.iterrows()
+    }
+    chosen_desc   = st.selectbox("Выберите шаблон письма", list(prompt_map.keys()))
+    prompt_template = prompt_map[chosen_desc]
 
-    # 6) Генерация HTML-письма
-    if st.button("🚀 Сгенерировать письмо"):
+    # 6) Генерация и вывод HTML-email
+    if st.button("🚀 Сгенерировать Email"):
         if not selected_ids:
             st.error("Нужно выбрать хотя бы одного клиента.")
         else:
             html_blocks = []
             for cid in selected_ids:
                 client_row = customers_df[customers_df.id == cid].iloc[0].to_dict()
-                filled_prompt = template.format(**client_row)
+
+                # вычисляем deadline — через неделю после дня рождения
+                bd = datetime.fromisoformat(client_row['birth_date'])
+                deadline = (bd + timedelta(days=7)).strftime("%d.%m.%Y")
+                client_row['deadline'] = deadline
+
+                # подставляем все поля в шаблон
+                filled_prompt = prompt_template.format(**client_row)
 
                 with st.spinner(f"Генерирую письмо для {client_row['first_name']}..."):
                     resp = client.chat.completions.create(
                         model=model,
                         messages=[
-                            {
-                                "role": "system",
-                                "content": (
-                                    "Вы — опытный маркетолог, писатель продающих и мотивирующих email-рассылок."
-                                )
-                            },
+                            {"role": "system", "content":
+                                "Вы — опытный маркетолог, создающий HTML-email. "
+                                "Верните готовый HTML-фрагмент письма: тема в <h1>, "
+                                "тело в <div> с inline-CSS, без <html>/<body>."},
                             {"role": "user", "content": filled_prompt}
                         ],
                         temperature=temperature,
                         top_p=top_p,
                         max_tokens=max_tokens,
                     )
+                html_content = resp.choices[0].message.content.strip()
+                html_blocks.append(f"<section style='margin-bottom:24px'>{html_content}</section>")
 
-                # Получаем текст ответа
-                answer = resp.choices[0].message.content.strip()
-                # Оборачиваем ответ в простой HTML-блок
-                html = f"""
-<div style="
-    background: #ffffff;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 20px;
-    margin-bottom: 24px;
-    font-family: Arial, sans-serif;
-">
-  <h2 style="margin-top:0; color:#333;">
-    Письмо для {client_row['first_name']} {client_row['last_name']}
-  </h2>
-  <div style="white-space: pre-wrap; line-height:1.5; color:#444;">
-    {answer}
-  </div>
-</div>
-"""
-                html_blocks.append(html)
-
-            # Собираем всё вместе и показываем в компоненте
-            full_html = (
-                "<div style='background:#f7f7f7; padding:20px;'>"
-                + "".join(html_blocks) +
-                "</div>"
-            )
-            components.html(full_html, height=700, scrolling=True)
+            # объединяем и показываем результат
+            final_html = "<div style='background:#f9f9f9;padding:16px;border-radius:8px'>" + "".join(html_blocks) + "</div>"
+            components.html(final_html, height=600, scrolling=True)
 
 if __name__ == "__main__":
     main()
